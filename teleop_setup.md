@@ -1,6 +1,8 @@
 # Introduction
 
-This document contains the steps necessary to install `ros`, `openpose`, the `azure kinect driver`, `ros openpose` and the `naoqi bridge`. This software can only be used with linux and was tested on ubuntu 20 (however unless your hardware is very new, ubuntu 18 is probably easier to configure). Many install steps are dependent on the version you are using. 
+This document contains the steps necessary to install `ros`, `openpose`, the `azure kinect driver`, `ros openpose` and the `naoqi bridge`. This will enable you to do pose estimation on human bodies and copy the estimated pose to the robot. 
+
+This software can only be used with linux and was tested on ubuntu 20 (however unless your hardware is very new, ubuntu 18 is probably easier to configure). Many install steps are dependent on the version you are using. 
 
 
 I like to install these nice-to-haves but they are not necessary
@@ -9,13 +11,13 @@ sudo apt install terminator aptitude
 sudo snap install vscode
 ```
 
-## General requirements
+# General requirements
 These packages are necessary for multiple steps along the way and should be available on any linux distribution:
 ```
 sudo apt install curl git libblas-dev liblapack-dev libatlas-base-dev python python3-pip
 ```
 
-## Ros
+# Ros
 Installing Robotic Operating System
 ```
 sudo sh -c 'echo "deb http://packages.ros.org/ros/ubuntu $(lsb_release -sc) main" > /etc/apt/sources.list.d/ros-latest.list'
@@ -41,10 +43,10 @@ python -m pip install PyYAML rospkg
 ```
 
 
-## Openpose 
+# Openpose 
 We will use openpose to do the human pose estimation
 
-### Cuda
+## Cuda
 Openpose requires cuda. Some cuda versions might not work well, and you may need specific cuda versions to work with your specific graphics card. Cuda 11.7 supports almost all modern graphics cards and is tested with openpose so this version is recommended. 
 
 Change `ubuntu2004` in the following with `ubuntu1804` if you are running ubuntu 18. 
@@ -64,7 +66,7 @@ sudo apt-get update
 sudo apt-get -y install cuda
 ```
 
-### cuDnn
+## cuDnn
 Like cuda, the specific version of cuDnn is important for the software to run correctly. Version 8.5 is tested and is hence recommended.
 
 Change `ubuntu2004` in the following with `ubuntu1804` if you are running ubuntu 18. Change the cuda version if you are running an other cuda version than 11.7. 
@@ -81,7 +83,7 @@ sudo apt-get install libcudnn8=8.5.0.*-1+cuda11.7
 sudo apt-get install libcudnn8-dev=8.5.0.*-1+cuda11.7
 ```
 
-### Openpose itself
+## Openpose itself
 Now we get to build openpose itself. 
 
 ```
@@ -111,7 +113,7 @@ sudo make install
 If you get 'unsupported compute type' errors when building caffe as part of openpose, edit `/openpose/3rdparty/caffe/cmake/Cuda.cmake` and `$HOME/pepper_teleop/openpose/cmake/Cuda.cmake` to reflect the correct graphics card for your device (eg. `set(Caffe_known_gpu_archs "${AMPERE}")`)
 
 
-## Azure kinect ros driver
+# Azure kinect ros driver
 This is necessary to get the Azure kinect RGBD camera working in ros. If you want to use other cameras, you need other drivers. 
 - [Realsense-ros](https://github.com/IntelRealSense/realsense-ros): For Intel RealSense Camera
 - [iai_kinect2](https://github.com/code-iai/iai_kinect2): For Microsoft Kinect v2 Camera
@@ -165,7 +167,7 @@ sudo dpkg -i k4a-tools_1.3.0_amd64.deb
 ```
 
 ---
-### Azure kinect driver itself
+## Azure kinect driver itself
 ```
 sudo apt install ninja-build
 
@@ -179,7 +181,8 @@ ninja
 sudo ninja install
 ```
 
-## Ros openpose
+# Ros openpose
+An openpose to ros bridge, to use openpose recognized poses in ros.
 *from https://github.com/ravijo/ros_openpose*
 
 ```
@@ -208,15 +211,25 @@ If you want to render the hands as well add `--hand` to `openpose_args` and chan
 
 If you get out of memory errors, you can reduce the resolution of the openpose network with `--net-resolution -1x256` or smaller in `openpose_args` in `$HOME/pepper_teleop/catkin_ws/src/ros_openpose/launch/run.launch`
 
-## Naoqi bridge
+# Naoqi bridge
+A bridge which is required to connect to the pepper robot from ros
+
 Install the naoqi bridge with
 ```
-sudo apt-get install ros-.*-naoqi-driver
+sudo apt-get install ros-noetic-naoqi-bridge-msgs  ros-noetic-naoqi-libqicore
+ros-noetic-naoqi-libqi 
+
+cd $HOME/pepper_teleop/catkin_ws/src
+git clone https://github.com/ros-naoqi/naoqi_driver.git
+cd $HOME/pepper_teleop/catkin_ws/
+catkin_make
 ```
 Launch with
 ```
 roslaunch naoqi_driver naoqi_driver.launch nao_ip:=192.168.1.61 roscore_ip:=127.0.0.1 network_interface:=eth0
 ```
+The `roscore_ip` is probably correct, but the network interface might not be. This should be updated with whatever `ifconfig` says your network interface is called. This can be eth0/vpn1/wlp4s0/... The `nao_ip` should match the pepper's ip, which you can find out by pressing the button under the tablet once. 
+
 
 ## Your own code!
 
@@ -225,6 +238,33 @@ Use the following to create a new package with the dependencies you will need.
 catkin_create_pkg control_pepper geometry_msgs std_msgs rospy roscpp naoqi_bridge_msgs joy
 ```
 
-You can publish `naoqi_bridge_msgs/JointAnglesWithSpeed` messages to the topic `/joint_angles` to command the joints. The `JointAnglesWithSpeed` should have the following values:
 
-<!-- http://ros-naoqi.github.io/naoqi_driver/topics.html -->
+You can publish [`naoqi_bridge_msgs/JointAnglesWithSpeed`](http://docs.ros.org/en/jade/api/naoqi_bridge_msgs/html/msg/JointAnglesWithSpeed.html) messages to the topic `/joint_angles` to command the joints. The `JointAnglesWithSpeed` consists of a `header`, `joint_names`, `joint_angles`, `speed` and `relative`
+
+The `joint_names` are documented on http://doc.aldebaran.com/2-5/family/pepper_technical/joints_pep.html and can be the following:
+  - HeadYaw
+  - HeadPitch
+  - LShoulderPitch
+  - LShoulderRoll
+  - LElbowYaw
+  - LElbowRoll
+  - LWristYaw
+  - LHand
+  - HipRoll
+  - HipPitch
+  - KneePitch
+  - RShoulderPitch
+  - RShoulderRoll
+  - RElbowYaw
+  - RElbowRoll
+  - RWristYaw
+  - RHand
+  - WheelFL
+  - WheelFR
+  - WheelB
+
+The `joint_angles` are values in **radians**. Naturally, the number of `joint_angles` should be equal to the number of `joint_names`, but they do not need to all be present. 
+
+The `speed` is between 0 and 1, where 1 is the maximum speed
+
+`relative` sets relative or absolute movement. 
