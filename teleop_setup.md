@@ -1,11 +1,15 @@
 # Introduction
-
 This document contains the steps necessary to install `ros`, `openpose`, the `azure kinect driver`, `ros openpose` and the `naoqi bridge`. This will enable you to do pose estimation on human bodies and copy the estimated pose to the robot. 
+
+The general goal is to copy the pose of a human body to a robot. The pose of the human body is estimated through a computer vision model. Through this estimate, the joint angles of the joints on the human body can be derived, which can be translated to joint angles in the robot's joint space. We can then send these joint angles to robot to make the robot mimick us. 
+
+There are several ways to do pose estimation, and this document provides instructions for different configurations. It is therefore not necessary to go through **every** step, and only the steps which are required for the configuration you want need to be followed. `Openpose` enables you to use RGB cameras (eg. webcams) to get started without an RGBD camera. However openpose is limited to 2D pose estimation unless you connect 2 cameras. Alternatively, an RGBD camera (such as the `Azure Kinect`) can do 3D pose estimation which is required to properly translate poses between the human and the robot. 
+
+Ros is used as a middleware in any of the configurations, and the `Naoqi bridge` is necessary to interface with the Pepper robot from ros.
 
 This software can only be used with linux and was tested on ubuntu 20 (however unless your hardware is very new, ubuntu 18 is probably easier to configure). Many install steps are dependent on the version you are using. 
 
-
-I like to install these nice-to-haves but they are not necessary
+Let's get started! I like to install these nice-to-haves but they are not necessary
 ```
 sudo apt install terminator aptitude
 sudo snap install vscode
@@ -43,8 +47,89 @@ python -m pip install PyYAML rospkg
 ```
 
 
+# Azure kinect ros driver
+This is necessary to get the Azure kinect RGBD camera working in ros. If you want to use other cameras with Openpose, you need other drivers. 
+- [Realsense-ros](https://github.com/IntelRealSense/realsense-ros): For Intel RealSense Camera
+- [iai_kinect2](https://github.com/code-iai/iai_kinect2): For Microsoft Kinect v2 Camera
+- [zed-ros-wrapper](https://github.com/stereolabs/zed-ros-wrapper): For Stereolabs ZED2 Camera
+
+Again, change 20.04 to 18.04 if on ubuntu 18.
+```
+curl -sSL https://packages.microsoft.com/keys/microsoft.asc | sudo tee /etc/apt/trusted.gpg.d/microsoft.asc
+
+sudo apt-add-repository https://packages.microsoft.com/ubuntu/20.04/prod
+```
+
+Somehow this package assumes an i386 architecture, modify `/etc/apt/sources.list`. At the bottom of the file, change this:
+
+```
+deb https://packages.microsoft.com/ubuntu/20.04/prod focal main
+# deb-src https://packages.microsoft.com/ubuntu/20.04/prod focal main
+```
+to:
+```
+deb [arch=amd64] https://packages.microsoft.com/ubuntu/20.04/prod focal main
+# deb-src [arch=amd64] https://packages.microsoft.com/ubuntu/20.04/prod focal main
+```
+---
+If you are on ubuntu 18 you can install k4a, version 1.3 works out of the box. However, if you have an RTX 30XX graphics card you need version 1.4. You then also need to edit `$HOME/pepper_teleop/catkin_ws/src/Azure_Kinect_ROS_Driver/CMakeLists.txt` and [manually copy the sdk files](https://github.com/microsoft/Azure_Kinect_ROS_Driver/blob/melodic/docs/building.md#alternate-sdk-installation) to make sure it finds the right version 
+
+```
+sudo apt-get update
+sudo apt install k4a-tools=1.3.*
+sudo apt install libk4a1.3
+sudo apt install libk4a1.3-dev
+```
+
+If you are on ubuntu 20, these packages are not available and it is easiest to just download them. Download the 1.4 versions `libk4a` and the 1.1 versions of `libk4abt` if you have an RTX 30XX card.
+```
+wget https://packages.microsoft.com/ubuntu/18.04/prod/pool/main/libk/libk4a1.3/libk4a1.3_1.3.0_amd64.deb
+wget https://packages.microsoft.com/ubuntu/18.04/prod/pool/main/libk/libk4a1.3-dev/libk4a1.3-dev_1.3.0_amd64.deb
+wget https://packages.microsoft.com/ubuntu/18.04/prod/pool/main/libk/libk4abt1.0/libk4abt1.0_1.0.0_amd64.deb
+wget https://packages.microsoft.com/ubuntu/18.04/prod/pool/main/libk/libk4abt1.0-dev/libk4abt1.0-dev_1.0.0_amd64.deb
+wget https://packages.microsoft.com/ubuntu/18.04/prod/pool/main/k/k4a-tools/k4a-tools_1.3.0_amd64.deb
+
+```
+Install all above packages:
+```
+sudo dpkg -i libk4a1.3_1.3.0_amd64.deb
+sudo dpkg -i libk4a1.3-dev_1.3.0_amd64.deb
+sudo dpkg -i libk4abt1.0_1.0.0_amd64.deb
+sudo dpkg -i libk4abt1.0-dev_1.0.0_amd64.deb
+sudo dpkg -i libk4a1.3_1.3.0_amd64.deb
+sudo dpkg -i k4a-tools_1.3.0_amd64.deb
+```
+
+The driver also requires `cuda`. There are installation instructions for `cuda` in the `openpose` section. If you are not going to also use `openpose`, you can install any version you like. 
+
+
+---
+## Azure kinect driver itself
+```
+sudo apt install ninja-build
+
+mkdir $HOME/pepper_teleop/catkin_ws/src
+cd $HOME/pepper_teleop/catkin_ws/src
+git clone https://github.com/microsoft/Azure_Kinect_ROS_Driver.git
+
+mkdir build && cd build
+cmake .. -GNinja
+ninja
+sudo ninja install
+```
+
+From here, the Azure Kinect driver can perform 3D body tracking. You can lauch the body tracking with 
+
+```
+roslaunch azure_kinect_ros_driver driver_with_bodytracking.launch 
+```
+
+The points tracked in the Azure kinect tracking are the following:
+![](https://learn.microsoft.com/en-us/azure/kinect-dk/media/concepts/joint-hierarchy.png)
+
+---
 # Openpose 
-We will use openpose to do the human pose estimation
+Openpose can be used to estimate the pose of a human. It support multiple camera types, both RGB and RGBD. It can be build with cuda support to increase performance, but can also run on CPU if you do not have a graphics card. 
 
 ## Cuda
 Openpose requires cuda. Some cuda versions might not work well, and you may need specific cuda versions to work with your specific graphics card. Cuda 11.7 supports almost all modern graphics cards and is tested with openpose so this version is recommended. 
@@ -113,74 +198,6 @@ sudo make install
 If you get 'unsupported compute type' errors when building caffe as part of openpose, edit `/openpose/3rdparty/caffe/cmake/Cuda.cmake` and `$HOME/pepper_teleop/openpose/cmake/Cuda.cmake` to reflect the correct graphics card for your device (eg. `set(Caffe_known_gpu_archs "${AMPERE}")`)
 
 
-# Azure kinect ros driver
-This is necessary to get the Azure kinect RGBD camera working in ros. If you want to use other cameras, you need other drivers. 
-- [Realsense-ros](https://github.com/IntelRealSense/realsense-ros): For Intel RealSense Camera
-- [iai_kinect2](https://github.com/code-iai/iai_kinect2): For Microsoft Kinect v2 Camera
-- [zed-ros-wrapper](https://github.com/stereolabs/zed-ros-wrapper): For Stereolabs ZED2 Camera
-
-Again, change 20.04 to 18.04 if on ubuntu 18.
-```
-curl -sSL https://packages.microsoft.com/keys/microsoft.asc | sudo tee /etc/apt/trusted.gpg.d/microsoft.asc
-
-sudo apt-add-repository https://packages.microsoft.com/ubuntu/20.04/prod
-```
-
-Somehow this package assumes an i386 architecture, modify `/etc/apt/sources.list`. At the bottom of the file, change this:
-
-```
-deb https://packages.microsoft.com/ubuntu/20.04/prod focal main
-# deb-src https://packages.microsoft.com/ubuntu/20.04/prod focal main
-```
-to:
-```
-deb [arch=amd64] https://packages.microsoft.com/ubuntu/20.04/prod focal main
-# deb-src [arch=amd64] https://packages.microsoft.com/ubuntu/20.04/prod focal main
-```
----
-If you are on ubuntu 18 you can install k4a, be sure to get version 1.3 and not 1.4 as 1.4 does not work.
-```
-sudo apt-get update
-sudo apt install k4a-tools=1.3.*
-sudo apt install libk4a1.3
-sudo apt install libk4a1.3-dev
-```
-
-If you are on ubuntu 20, these packages are not available and it is easiest to just download them:
-```
-wget https://packages.microsoft.com/ubuntu/18.04/prod/pool/main/libk/libk4a1.3/libk4a1.3_1.3.0_amd64.deb
-wget https://packages.microsoft.com/ubuntu/18.04/prod/pool/main/libk/libk4a1.3-dev/libk4a1.3-dev_1.3.0_amd64.deb
-wget https://packages.microsoft.com/ubuntu/18.04/prod/pool/main/libk/libk4abt1.0/libk4abt1.0_1.0.0_amd64.deb
-wget https://packages.microsoft.com/ubuntu/18.04/prod/pool/main/libk/libk4abt1.0-dev/libk4abt1.0-dev_1.0.0_amd64.deb
-wget https://packages.microsoft.com/ubuntu/18.04/prod/pool/main/libk/libk4a1.3/libk4a1.3_1.3.0_amd64.deb
-wget https://packages.microsoft.com/ubuntu/18.04/prod/pool/main/k/k4a-tools/k4a-tools_1.3.0_amd64.deb
-
-```
-Install all above packages:
-```
-sudo dpkg -i libk4a1.3_1.3.0_amd64.deb
-sudo dpkg -i libk4a1.3-dev_1.3.0_amd64.deb
-sudo dpkg -i libk4abt1.0_1.0.0_amd64.deb
-sudo dpkg -i libk4abt1.0-dev_1.0.0_amd64.deb
-sudo dpkg -i libk4a1.3_1.3.0_amd64.deb
-sudo dpkg -i k4a-tools_1.3.0_amd64.deb
-```
-
----
-## Azure kinect driver itself
-```
-sudo apt install ninja-build
-
-mkdir $HOME/pepper_teleop/catkin_ws/src
-cd $HOME/pepper_teleop/catkin_ws/src
-git clone https://github.com/microsoft/Azure_Kinect_ROS_Driver.git
-
-mkdir build && cd build
-cmake .. -GNinja
-ninja
-sudo ninja install
-```
-
 # Ros openpose
 An openpose to ros bridge, to use openpose recognized poses in ros.
 *from https://github.com/ravijo/ros_openpose*
@@ -210,6 +227,9 @@ roslaunch ros_openpose run.launch camera:=azurekinect
 If you want to render the hands as well add `--hand` to `openpose_args` and change `skeleton_hands` to `true` in `$HOME/pepper_teleop/catkin_ws/src/ros_openpose/launch/run.launch`
 
 If you get out of memory errors, you can reduce the resolution of the openpose network with `--net-resolution -1x256` or smaller in `openpose_args` in `$HOME/pepper_teleop/catkin_ws/src/ros_openpose/launch/run.launch`
+
+## openpose body points
+![body points](https://cmu-perceptual-computing-lab.github.io/openpose/web/html/.github/media/keypoints_pose_25.png)
 
 # Naoqi bridge
 A bridge which is required to connect to the pepper robot from ros
@@ -268,3 +288,4 @@ The `joint_angles` are values in **radians**. Naturally, the number of `joint_an
 The `speed` is between 0 and 1, where 1 is the maximum speed
 
 `relative` sets relative or absolute movement. 
+
