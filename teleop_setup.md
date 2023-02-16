@@ -124,8 +124,48 @@ From here, the Azure Kinect driver can perform 3D body tracking. You can lauch t
 roslaunch azure_kinect_ros_driver driver_with_bodytracking.launch 
 ```
 
+
+
+
+
 The points tracked in the Azure kinect tracking are the following:
 ![](https://learn.microsoft.com/en-us/azure/kinect-dk/media/concepts/joint-hierarchy.png)
+
+The indices in the /body_tracking_data topic are as follows:
+
+
+0. PELVIS 
+1. SPINE_NAVEL
+1. SPINE_CHEST
+1. NECK  
+1. CLAVICLE_LEFT
+1. SHOULDER_LEFT
+1. ELBOW_LEFT
+1. WRIST_LEFT
+1. HAND_LEFT
+1. HANDTIP_LEFT
+1. THUMB_LEFT
+1. CLAVICLE_RIGHT
+1. SHOULDER_RIGHT
+1. ELBOW_RIGHT
+1. WRIST_RIGHT
+1. HAND_RIGHT
+1. HANDTIP_RIGHT
+1. THUMB_RIGHT
+1. HIP_LEFT
+1. KNEE_LEFT
+1. ANKLE_LEFT
+1. FOOT_LEFT
+1. HIP_RIGHT
+1. KNEE_RIGHT
+1. ANKLE_RIGHT
+1. FOOT_RIGHT
+1. HEAD
+1. NOSE
+1. EYE_LEFT
+1. EAR_LEFT
+1. EYE_RIGHT
+1. EAR_RIGHT
 
 ---
 # Openpose 
