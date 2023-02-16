@@ -134,6 +134,41 @@ sudo ninja install
 </code></pre>
 <p>The points tracked in the Azure kinect tracking are the following:
 <img src="https://learn.microsoft.com/en-us/azure/kinect-dk/media/concepts/joint-hierarchy.png" alt=""></p>
+<p>The indices in the /body_tracking_data topic are as follows:</p>
+<ol start="0">
+<li>PELVIS</li>
+<li>SPINE_NAVEL</li>
+<li>SPINE_CHEST</li>
+<li>NECK</li>
+<li>CLAVICLE_LEFT</li>
+<li>SHOULDER_LEFT</li>
+<li>ELBOW_LEFT</li>
+<li>WRIST_LEFT</li>
+<li>HAND_LEFT</li>
+<li>HANDTIP_LEFT</li>
+<li>THUMB_LEFT</li>
+<li>CLAVICLE_RIGHT</li>
+<li>SHOULDER_RIGHT</li>
+<li>ELBOW_RIGHT</li>
+<li>WRIST_RIGHT</li>
+<li>HAND_RIGHT</li>
+<li>HANDTIP_RIGHT</li>
+<li>THUMB_RIGHT</li>
+<li>HIP_LEFT</li>
+<li>KNEE_LEFT</li>
+<li>ANKLE_LEFT</li>
+<li>FOOT_LEFT</li>
+<li>HIP_RIGHT</li>
+<li>KNEE_RIGHT</li>
+<li>ANKLE_RIGHT</li>
+<li>FOOT_RIGHT</li>
+<li>HEAD</li>
+<li>NOSE</li>
+<li>EYE_LEFT</li>
+<li>EAR_LEFT</li>
+<li>EYE_RIGHT</li>
+<li>EAR_RIGHT</li>
+</ol>
 <hr>
 <h1 id="openpose">Openpose</h1>
 <p>Openpose can be used to estimate the pose of a human. It support multiple camera types, both RGB and RGBD. It can be build with cuda support to increase performance, but can also run on CPU if you do not have a graphics card.</p>
